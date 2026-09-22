@@ -166,3 +166,9 @@ variable "trapper_ingress_cidrs" {
     "205.197.213.192/27", # Corp Centracom
   ]
 }
+
+variable "secretsmanager_endpoint_sg_id" {
+  description = "Security group of the VPC's Secrets Manager interface endpoint (vpce-0758d22218276d2d9, private DNS on). Every host in the VPC resolves secretsmanager.us-west-2.amazonaws.com to that endpoint, so this SG must admit the Zabbix host or the boot-time secret fetch times out. Set to \"\" if the endpoint is ever removed."
+  type        = string
+  default     = "sg-02fc84a6affdb351a"
+}

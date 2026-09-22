@@ -195,3 +195,22 @@ resource "aws_autoscaling_group" "zabbix" {
   }
 
 }
+
+# ---------------------------------------------------------------------------
+# The VPC has a Secrets Manager interface endpoint with private DNS enabled
+# (created outside this repo). That hijacks the service hostname for the whole
+# VPC, so our host can only reach Secrets Manager if the endpoint's SG lets it
+# in. We own this one rule on that group; the group itself is not ours.
+# Discovered 2026-09-22 when the first boot timed out on the secret fetch.
+# ---------------------------------------------------------------------------
+resource "aws_vpc_security_group_ingress_rule" "secretsmanager_endpoint_from_zabbix" {
+  count = var.secretsmanager_endpoint_sg_id == "" ? 0 : 1
+
+  security_group_id            = var.secretsmanager_endpoint_sg_id
+  description                  = "HTTPS from netmon-zabbix host (Secrets Manager endpoint)"
+  ip_protocol                  = "tcp"
+  from_port                    = 443
+  to_port                      = 443
+  referenced_security_group_id = aws_security_group.zabbix.id
+  tags                         = { Name = "netmon-zabbix to secretsmanager endpoint" }
+}
