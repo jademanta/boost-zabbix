@@ -17,9 +17,9 @@ output "db_secret_arn" {
   value       = aws_db_instance.zabbix.master_user_secret[0].secret_arn
 }
 
-output "caddy_state_bucket" {
-  description = "Holds Caddy's certificate dir between rebuilds."
-  value       = aws_s3_bucket.state.bucket
+output "caddy_state_path" {
+  description = "Where Caddy's certificate dir lives between rebuilds."
+  value       = "s3://${aws_s3_bucket.state.bucket}/${local.state_prefix}/"
 }
 
 output "asg_name" {

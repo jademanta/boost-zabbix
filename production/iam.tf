@@ -55,16 +55,19 @@ resource "aws_iam_role_policy" "zabbix_host_bootstrap" {
         ]
       },
       {
-        Sid      = "ListStateBucket"
+        Sid      = "ListCaddyPrefixOnly"
         Effect   = "Allow"
         Action   = ["s3:ListBucket"]
         Resource = aws_s3_bucket.state.arn
+        Condition = {
+          StringLike = { "s3:prefix" = ["${local.state_prefix}/*", local.state_prefix] }
+        }
       },
       {
         Sid      = "SyncCaddyState"
         Effect   = "Allow"
         Action   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
-        Resource = "${aws_s3_bucket.state.arn}/caddy/*"
+        Resource = "${aws_s3_bucket.state.arn}/${local.state_prefix}/*"
       },
       {
         Sid      = "ReportOwnHealth"

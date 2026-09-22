@@ -14,8 +14,8 @@ Cloudflare (netmon.boocorp.com, proxied)
         |
   Auto Scaling group, min = max = 1
         |
-  EC2 (Ubuntu 24.04, stock AMI)            S3 bucket netmon-zabbix-state-*
-    caddy ---------------------------------> caddy/ (certs, restored at boot, saved hourly)
+  EC2 (Ubuntu 24.04, stock AMI)            S3 boost-caddy-state-*/netmon-zabbix/
+    caddy ---------------------------------> (certs, restored at boot, saved hourly)
     zabbix-web  \
     zabbix-server ---> RDS MySQL 8.4 (netmon-zabbix, private subnets, encrypted, 14-day backups)
     zabbix-agent2 (host package)
@@ -37,7 +37,7 @@ the RDS database. The EC2 host holds only running containers, so:
 The EC2 node is the Zabbix **server** (master). Lehi corp-LAN devices are reached
 through a lightweight Zabbix **proxy** there, not a second server.
 
-- `production/` - Terraform (ASG + launch template, SG rules, EIP, IAM/SSM, RDS, S3 state bucket)
+- `production/` - Terraform (ASG + launch template, SG rules, EIP, IAM/SSM, RDS, shared Caddy-state bucket)
 - `production/docker/` - the compose stack the host runs (server, web, Caddy)
 - `production/scripts/bootstrap.sh` - user-data: Docker install, EIP, secrets, S3 restore, `compose up`, timers
 - `production/scripts/healthcheck.sh` - per-minute container health -> ASG
@@ -123,7 +123,7 @@ Then point `netmon.boocorp.com` (Cloudflare, proxied, SSL Full strict) at
 - **Launch template changes** (new AMI, edited `bootstrap.sh`) do not touch the running host.
   They take effect on the next launch. Roll deliberately with the self-heal command.
 - **RDS changes** wait for the Sunday 03:00-04:00 MT maintenance window (`apply_immediately = false`).
-- **Never** `terraform destroy` casually: RDS, the EIP, and the state bucket are `prevent_destroy`.
+- **Never** `terraform destroy` casually: RDS, the EIP, and the Caddy state bucket are `prevent_destroy`.
 - **Editing `bootstrap.sh`**: the repo's Claude Code guard blocks Bash commands containing the
   secret-fetch CLI string, even as heredoc content. Edit the file with a file tool, not a shell heredoc.
 

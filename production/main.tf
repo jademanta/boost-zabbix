@@ -136,6 +136,7 @@ resource "aws_launch_template" "zabbix" {
     db_secret_arn   = aws_db_instance.zabbix.master_user_secret[0].secret_arn
     db_host         = aws_db_instance.zabbix.address
     state_bucket    = aws_s3_bucket.state.bucket
+    state_prefix    = local.state_prefix
     repo_url        = var.repo_url
     repo_branch     = var.repo_branch
     zabbix_version  = var.zabbix_version

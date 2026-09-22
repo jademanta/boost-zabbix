@@ -17,7 +17,7 @@ date
 export AWS_DEFAULT_REGION="${aws_region}"
 REPO_DIR=/opt/boost-zabbix
 RUN_DIR=/srv/zabbix          # secret files + caddy cert cache; local, ephemeral
-STATE_BUCKET="${state_bucket}"
+CADDY_S3="s3://${state_bucket}/${state_prefix}"
 TOKEN=$(curl -sX PUT http://169.254.169.254/latest/api/token -H "X-aws-ec2-metadata-token-ttl-seconds: 300")
 INSTANCE_ID=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
 mkdir -p /etc/zabbix-host && echo "${aws_region}" > /etc/zabbix-host/region
@@ -52,7 +52,7 @@ aws secretsmanager get-secret-value --secret-id "${db_secret_arn}" --query Secre
 chmod 600 "$RUN_DIR"/secrets/*
 
 # --- 4. Caddy certificates: restore from S3 (empty on the very first boot) ---
-aws s3 sync "s3://$STATE_BUCKET/caddy" "$RUN_DIR/caddy" --only-show-errors || echo "no caddy state in S3 yet"
+aws s3 sync "$CADDY_S3" "$RUN_DIR/caddy" --only-show-errors || echo "no caddy state in S3 yet"
 
 # --- 5. This repo: compose.yaml, Caddyfile, alertscripts --------------------
 git clone --branch "${repo_branch}" "${repo_url}" "$REPO_DIR"
@@ -99,7 +99,7 @@ Description=Save Caddy certificates to S3
 [Service]
 Type=oneshot
 Environment=AWS_DEFAULT_REGION=${aws_region}
-ExecStart=/usr/bin/aws s3 sync $RUN_DIR/caddy s3://$STATE_BUCKET/caddy --delete --only-show-errors
+ExecStart=/usr/bin/aws s3 sync $RUN_DIR/caddy $CADDY_S3 --delete --only-show-errors
 EOC
 cat > /etc/systemd/system/zabbix-caddy-backup.timer <<EOC
 [Unit]

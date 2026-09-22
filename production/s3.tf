@@ -3,8 +3,14 @@
 # a new certificate and Let's Encrypt allows 5 duplicates per week. Same idea as
 # Loki on S3, applied to a few KB. bootstrap.sh restores it before compose up; a
 # systemd timer saves it hourly.
+#
+# Dedicated bucket, shared by design: any Caddy-fronted host (n8n next) gets its
+# own prefix and an IAM grant scoped to that prefix. Kept separate from
+# boost.cloudformation so certificate private keys never sit next to Terraform
+# state and no instance role needs access to that bucket.
 locals {
-  state_bucket = "netmon-zabbix-state-${data.aws_caller_identity.current.account_id}"
+  state_bucket = "boost-caddy-state-${data.aws_caller_identity.current.account_id}"
+  state_prefix = "netmon-zabbix"
 }
 
 resource "aws_s3_bucket" "state" {
