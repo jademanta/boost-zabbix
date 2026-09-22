@@ -1,0 +1,83 @@
+# Zabbix on a disposable host. The database is RDS (DB_HOST); nothing in this
+# stack holds state that matters. Zabbix ships as two processes in two images:
+#   zabbix-server  the poller/alerter daemon (agents, proxies, SNMP talk to it)
+#   zabbix-web     the PHP UI (nginx + php-fpm); reads/writes the same DB
+# plus caddy for TLS. Same app + reverse-proxy layout as the n8n box.
+#
+# DB credentials are read from files (official-image *_FILE convention) written
+# by bootstrap.sh from Secrets Manager; they never appear in `docker inspect`
+# or this repo. See README "How the stack works".
+name: zabbix
+
+services:
+  zabbix-server:
+    image: zabbix/zabbix-server-mysql:alpine-${ZABBIX_VERSION}-latest
+    restart: unless-stopped
+    ports:
+      - "10051:10051"   # active agents and proxies connect here
+    environment:
+      DB_SERVER_HOST: ${DB_HOST}
+      MYSQL_DATABASE: zabbix
+      MYSQL_USER_FILE: /run/secrets/MYSQL_USER
+      MYSQL_PASSWORD_FILE: /run/secrets/MYSQL_PASSWORD
+      ZBX_DBTLSCONNECT: required        # RDS parameter group enforces TLS
+      ZBX_STARTPINGERS: "4"
+    volumes:
+      - ./alertscripts:/usr/lib/zabbix/alertscripts:ro       # git-controlled custom notification scripts
+      - ./externalscripts:/usr/lib/zabbix/externalscripts:ro # git-controlled custom check scripts
+      - ./mibs:/var/lib/zabbix/mibs:ro                       # extra SNMP MIBs
+    secrets:
+      - MYSQL_USER
+      - MYSQL_PASSWORD
+    ulimits:
+      nproc: 65535
+      nofile:
+        soft: 20000
+        hard: 40000
+
+  zabbix-web:
+    image: zabbix/zabbix-web-nginx-mysql:alpine-${ZABBIX_VERSION}-latest
+    restart: unless-stopped
+    depends_on:
+      - zabbix-server
+    # No ports: only reachable through caddy on the compose network (port 8080).
+    environment:
+      DB_SERVER_HOST: ${DB_HOST}
+      MYSQL_DATABASE: zabbix
+      MYSQL_USER_FILE: /run/secrets/MYSQL_USER
+      MYSQL_PASSWORD_FILE: /run/secrets/MYSQL_PASSWORD
+      ZBX_DB_ENCRYPTION: "true"
+      ZBX_SERVER_HOST: zabbix-server
+      ZBX_SERVER_NAME: ${ZBX_SERVER_NAME}
+      PHP_TZ: ${TZ}
+    secrets:
+      - MYSQL_USER
+      - MYSQL_PASSWORD
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      - zabbix-web
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      FQDN: ${FQDN}
+      ACME_EMAIL: ${ACME_EMAIL}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ${RUN_DIR}/caddy/data:/data       # certificates (re-issued on a rebuild)
+      - ${RUN_DIR}/caddy/config:/config
+
+secrets:
+  MYSQL_USER:
+    file: ${RUN_DIR}/secrets/MYSQL_USER
+  MYSQL_PASSWORD:
+    file: ${RUN_DIR}/secrets/MYSQL_PASSWORD

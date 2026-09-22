@@ -1,0 +1,8 @@
+{
+	email {$ACME_EMAIL}
+}
+
+{$FQDN} {
+	encode zstd gzip
+	reverse_proxy zabbix-web:8080
+}

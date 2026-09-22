@@ -1,0 +1,20 @@
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+tfplan
+*.tfvars
+!*.tfvars.example
+.terraform.tfstate.lock.info
+crash.log
+
+# Runtime-only files (generated on the instance)
+production/docker/.env
+**/secrets/
+
+# Editors / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
