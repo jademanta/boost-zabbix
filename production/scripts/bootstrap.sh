@@ -7,12 +7,14 @@
 # Manager via the instance role, Caddy's certificates are restored from S3,
 # config comes from this repo. Nothing on this disk needs to survive.
 #
+# Safe to re-run on a half-bootstrapped host: every step checks before it acts.
+#
 # NOTE for editors: this file is written with the Write tool, not a Bash
 # heredoc. The repo guard blocks shell commands containing the secret-fetch CLI
 # string, even when it is only file content.
 set -euo pipefail
-exec >/var/log/zabbix-bootstrap.log 2>&1
-date
+exec >>/var/log/zabbix-bootstrap.log 2>&1
+echo "=== bootstrap start $(date)"
 
 export AWS_DEFAULT_REGION="${aws_region}"
 REPO_DIR=/opt/boost-zabbix
@@ -27,19 +29,23 @@ mkdir -p /etc/zabbix-host && echo "${aws_region}" > /etc/zabbix-host/region
 # official installer into /usr/local/bin. Architecture-agnostic for the arm64 image later.
 apt-get update -y
 apt-get install -y ca-certificates curl gnupg git jq unzip
-curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-$(uname -m).zip" -o /tmp/awscliv2.zip
-unzip -q /tmp/awscliv2.zip -d /tmp
-/tmp/aws/install
-rm -rf /tmp/aws /tmp/awscliv2.zip
+if ! command -v aws >/dev/null; then
+  curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-$(uname -m).zip" -o /tmp/awscliv2.zip
+  unzip -q -o /tmp/awscliv2.zip -d /tmp
+  /tmp/aws/install
+  rm -rf /tmp/aws /tmp/awscliv2.zip
+fi
 aws --version
 
-install -m 0755 -d /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-chmod a+r /etc/apt/keyrings/docker.asc
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$${VERSION_CODENAME}") stable" \
-  > /etc/apt/sources.list.d/docker.list
-apt-get update -y
-apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+if ! command -v docker >/dev/null; then
+  install -m 0755 -d /etc/apt/keyrings
+  curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+  chmod a+r /etc/apt/keyrings/docker.asc
+  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$${VERSION_CODENAME}") stable" \
+    > /etc/apt/sources.list.d/docker.list
+  apt-get update -y
+  apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+fi
 systemctl enable --now docker
 usermod -aG docker ubuntu
 
@@ -51,6 +57,7 @@ echo "EIP ${eip_alloc_id} associated with $INSTANCE_ID"
 # The RDS-managed master secret is JSON {"username":..,"password":..}. It is
 # read by the instance role at boot and written to root-only files that compose
 # mounts as /run/secrets/*; it is never placed in an env var or in this repo.
+# Reaching Secrets Manager depends on the VPC endpoint SG rule in main.tf.
 mkdir -p "$RUN_DIR/secrets" "$RUN_DIR/caddy/data" "$RUN_DIR/caddy/config"
 chmod 700 "$RUN_DIR/secrets"
 aws secretsmanager get-secret-value --secret-id "${db_secret_arn}" --query SecretString --output text \
@@ -63,7 +70,11 @@ chmod 600 "$RUN_DIR"/secrets/*
 aws s3 sync "$CADDY_S3" "$RUN_DIR/caddy" --only-show-errors || echo "no caddy state in S3 yet"
 
 # --- 5. This repo: compose.yaml, Caddyfile, alertscripts --------------------
-git clone --branch "${repo_branch}" "${repo_url}" "$REPO_DIR"
+if [ -d "$REPO_DIR/.git" ]; then
+  git -C "$REPO_DIR" pull --ff-only
+else
+  git clone --branch "${repo_branch}" "${repo_url}" "$REPO_DIR"
+fi
 chown -R ubuntu:ubuntu "$REPO_DIR"
 cd "$REPO_DIR/production/docker"
 
@@ -122,14 +133,16 @@ systemctl daemon-reload
 systemctl enable --now zabbix-healthcheck.timer zabbix-caddy-backup.timer
 
 # --- 8. Zabbix agent 2 on the host (self-monitoring), as a normal package ----
-UBU="$(. /etc/os-release && echo "$${VERSION_ID}")"
-curl -fsSL "https://repo.zabbix.com/zabbix/${zabbix_version}/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest_${zabbix_version}+ubuntu$${UBU}_all.deb" -o /tmp/zabbix-release.deb
-dpkg -i /tmp/zabbix-release.deb
-apt-get update -y
-apt-get install -y zabbix-agent2
+if ! dpkg -s zabbix-agent2 >/dev/null 2>&1; then
+  UBU="$(. /etc/os-release && echo "$${VERSION_ID}")"
+  curl -fsSL "https://repo.zabbix.com/zabbix/${zabbix_version}/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest_${zabbix_version}+ubuntu$${UBU}_all.deb" -o /tmp/zabbix-release.deb
+  dpkg -i /tmp/zabbix-release.deb
+  apt-get update -y
+  apt-get install -y zabbix-agent2
+fi
 sed -i -e 's/^Server=.*/Server=127.0.0.1,172.16.0.0\/12/' \
        -e 's/^ServerActive=.*/ServerActive=127.0.0.1/' \
        -e 's/^Hostname=.*/Hostname=Zabbix server/' /etc/zabbix/zabbix_agent2.conf
 systemctl enable --now zabbix-agent2
 
-echo "bootstrap complete $(date)"
+echo "=== bootstrap complete $(date)"
