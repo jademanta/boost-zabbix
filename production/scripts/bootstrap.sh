@@ -22,9 +22,17 @@ TOKEN=$(curl -sX PUT http://169.254.169.254/latest/api/token -H "X-aws-ec2-metad
 INSTANCE_ID=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
 mkdir -p /etc/zabbix-host && echo "${aws_region}" > /etc/zabbix-host/region
 
-# --- 1. Packages: Docker (official repo), AWS CLI, jq ------------------------
+# --- 1. Packages: Docker (official repo), AWS CLI v2 (official installer), jq --
+# Ubuntu 24.04 has no `awscli` apt package (it became a snap), so use the
+# official installer into /usr/local/bin. Architecture-agnostic for the arm64 image later.
 apt-get update -y
-apt-get install -y ca-certificates curl gnupg git jq awscli
+apt-get install -y ca-certificates curl gnupg git jq unzip
+curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-$(uname -m).zip" -o /tmp/awscliv2.zip
+unzip -q /tmp/awscliv2.zip -d /tmp
+/tmp/aws/install
+rm -rf /tmp/aws /tmp/awscliv2.zip
+aws --version
+
 install -m 0755 -d /etc/apt/keyrings
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
 chmod a+r /etc/apt/keyrings/docker.asc
@@ -99,7 +107,7 @@ Description=Save Caddy certificates to S3
 [Service]
 Type=oneshot
 Environment=AWS_DEFAULT_REGION=${aws_region}
-ExecStart=/usr/bin/aws s3 sync $RUN_DIR/caddy $CADDY_S3 --delete --only-show-errors
+ExecStart=/usr/local/bin/aws s3 sync $RUN_DIR/caddy $CADDY_S3 --delete --only-show-errors
 EOC
 cat > /etc/systemd/system/zabbix-caddy-backup.timer <<EOC
 [Unit]
