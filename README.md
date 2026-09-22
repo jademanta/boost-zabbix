@@ -109,6 +109,10 @@ Then point `netmon.boocorp.com` (Cloudflare, proxied, SSL Full strict) at
 
 ## Day-2
 
+- **Lessons from the first launches** (all fixed in `bootstrap.sh`): Ubuntu 24.04 has no `awscli`
+  apt package (use the official installer); the VPC's Secrets Manager interface endpoint captures
+  the service hostname for the whole VPC, so its SG must admit this host (rule in `main.tf`);
+  compose file-secrets keep host ownership, so the files must be owned by uid 1997 (zabbix).
 - **Test the self-heal** (do this once after the first apply, then whenever bootstrap changes):
   `terraform output -raw self_heal_test_command | bash`. Expect a new instance with the same
   EIP and all Zabbix config intact in about 5 minutes.

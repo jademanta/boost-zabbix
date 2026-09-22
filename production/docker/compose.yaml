@@ -15,6 +15,8 @@ services:
     restart: unless-stopped
     ports:
       - "10051:10051"   # active agents and proxies connect here
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # lets the server poll the host's own zabbix-agent2
     environment:
       DB_SERVER_HOST: ${DB_HOST}
       MYSQL_DATABASE: zabbix

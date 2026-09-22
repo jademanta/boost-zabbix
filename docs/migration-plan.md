@@ -42,6 +42,22 @@ Add the two poller CIDRs (`terraform output poller_cidrs`, the ASG's subnets) to
 target SGs (list in current-state.md). CIDRs, not an IP: the host's private IP changes on
 every rebuild.
 
+**Status 2026-09-22: Phase 1 done.** RDS + ASG built, self-heal exercised twice (both fixes it
+surfaced are in `bootstrap.sh`), server 7.0.31 up against RDS, EIP 32.187.30.106.
+
+## Phase 1b - cutover DNS now (nothing else answers on netmon.boocorp.com)
+
+1. Cloudflare, zone boocorp.com: edit the A record `netmon` -> `32.187.30.106`, and set it to
+   **DNS only (grey cloud)** for the first pass so Caddy's HTTP-01 challenge reaches the host
+   directly. Within a minute or two `docker logs zabbix-caddy-1` shows the certificate obtained.
+2. Optional afterwards: turn the proxy back on (orange cloud) with SSL mode **Full (strict)**,
+   and consider Cloudflare Access in front of the login page.
+3. Internal AD DNS: update `netmon.boocorp.com` on the DCs to `32.187.30.106` as well.
+4. Log in at https://netmon.boocorp.com/ as Admin / zabbix and change the password immediately.
+5. First UI task: Data collection > Hosts > "Zabbix server" > interface: change the agent
+   interface from 127.0.0.1 to DNS name `host.docker.internal` so the server polls the host's
+   agent2 (it is a package on the host, not a container).
+
 ## Phase 2 - base Zabbix configuration
 
 - Admin password, disable `guest`, set frontend URL to https://netmon.boocorp.com.
