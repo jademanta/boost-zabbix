@@ -64,7 +64,10 @@ aws secretsmanager get-secret-value --secret-id "${db_secret_arn}" --query Secre
   | jq -r '.username' | tr -d '\n' > "$RUN_DIR/secrets/MYSQL_USER"
 aws secretsmanager get-secret-value --secret-id "${db_secret_arn}" --query SecretString --output text \
   | jq -r '.password' | tr -d '\n' > "$RUN_DIR/secrets/MYSQL_PASSWORD"
-chmod 600 "$RUN_DIR"/secrets/*
+# The Zabbix images run as user zabbix (uid 1997) and compose file-secrets keep
+# host ownership, so the files must be readable by that uid, not by root only.
+chown 1997:1997 "$RUN_DIR"/secrets/*
+chmod 400 "$RUN_DIR"/secrets/*
 
 # --- 4. Caddy certificates: restore from S3 (empty on the very first boot) ---
 aws s3 sync "$CADDY_S3" "$RUN_DIR/caddy" --only-show-errors || echo "no caddy state in S3 yet"
