@@ -136,6 +136,13 @@ dependency on apt mirrors, Docker Hub, and repo.zabbix.com. Model it on
 `data.aws_ami` to `owners = ["self"]` behind a `use_baked_ami` variable, and drop steps 1 and 8
 from `bootstrap.sh` when it is set.
 
+Do the **Graviton move at the same time** (decided 2026-09-22): bake the image arm64,
+set `instance_type = "t4g.medium"`, and change the AMI architecture filter to `arm64`.
+Every image in the stack (Zabbix, Caddy) and the zabbix-agent2 package ship arm64 builds.
+Saves ~$6/month; the account's Compute Savings Plan is saturated, so EC2 here is
+effectively on-demand and the cheaper instance is a real saving. Also consider a 1-year
+no-upfront RDS reserved instance for db.t4g.small after a month of stable running (~$6/month).
+
 ## Terraform state
 
 S3 `boost.cloudformation` / `Terraform_state_files/production/zabbix.tfstate`, S3-native
