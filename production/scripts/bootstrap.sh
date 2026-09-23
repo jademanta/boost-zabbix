@@ -147,6 +147,9 @@ fi
 sed -i -e 's/^Server=.*/Server=127.0.0.1,172.16.0.0\/12/' \
        -e 's/^ServerActive=.*/ServerActive=127.0.0.1/' \
        -e 's/^Hostname=.*/Hostname=Zabbix server/' /etc/zabbix/zabbix_agent2.conf
-systemctl enable --now zabbix-agent2
+# The package starts the agent with the default config at install time and
+# `enable --now` will not restart a running unit, so restart explicitly.
+systemctl enable zabbix-agent2
+systemctl restart zabbix-agent2
 
 echo "=== bootstrap complete $(date)"
