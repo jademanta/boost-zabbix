@@ -131,6 +131,32 @@ Then point `netmon.boocorp.com` (Cloudflare, proxied, SSL Full strict) at
 - **Editing `bootstrap.sh`**: the repo's Claude Code guard blocks Bash commands containing the
   secret-fetch CLI string, even as heredoc content. Edit the file with a file tool, not a shell heredoc.
 
+## Alerting (email + Slack)
+
+Delivery is in Terraform ([production/alerting.tf](/home/jade/git/boost-zabbix/production/alerting.tf)):
+a SES domain identity for boostability.com with Easy DKIM, an IAM user whose access key doubles
+as SES SMTP credentials (allowed only to send as netmon@boostability.com), and `/netmon-zabbix/*`
+SSM parameters. The Zabbix-side objects (Email + Slack media types, the notification-only
+`it-alerts` user, the "Notify IT: problems" action for Warning and above) are applied by
+`zabbix/apply-alerting.sh` **on the host**, which reads the parameters through the instance role
+so no credential passes through a laptop or a chat:
+
+```bash
+sudo bash /opt/boost-zabbix/zabbix/apply-alerting.sh
+```
+
+One-time inputs Jade provides out of band (values go straight into SSM):
+
+- Slack: create an app "Zabbix" in the boostability workspace, bot scope `chat:write`, install it,
+  invite `@Zabbix` to `#it-alerts`, then
+  `aws --profile boostprod ssm put-parameter --overwrite --name /netmon-zabbix/slack-bot-token --type SecureString --value 'xoxb-...'`
+- Zabbix API token: Users > API tokens > create for a Super admin user (no expiry), then
+  `aws --profile boostprod ssm put-parameter --overwrite --name /netmon-zabbix/api-token --type SecureString --value '...'`
+- DNS: the three DKIM CNAMEs from `terraform output ses_dkim_cnames`, in Cloudflare (DNS only).
+  Mail sent before they are published fails DMARC (p=quarantine) and lands in spam.
+
+Re-run `apply-alerting.sh` after changing any of these; it is idempotent.
+
 ## Phase 2: baked AMI with Packer
 
 Once the stack is proven, a Packer image (Docker, awscli, jq, zabbix-agent2 installed and the

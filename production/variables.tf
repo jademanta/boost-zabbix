@@ -167,6 +167,33 @@ variable "trapper_ingress_cidrs" {
   ]
 }
 
+# ---------------------------------------------------------------------------
+# Alerting
+# ---------------------------------------------------------------------------
+variable "alert_from_domain" {
+  description = "Domain verified in SES (Easy DKIM) that alert mail is sent from."
+  type        = string
+  default     = "boostability.com"
+}
+
+variable "alert_from_address" {
+  description = "From: address on Zabbix emails. Needs no mailbox; replies bounce. Must be under alert_from_domain."
+  type        = string
+  default     = "netmon@boostability.com"
+}
+
+variable "alert_email" {
+  description = "Where problem notifications go."
+  type        = string
+  default     = "it@boostability.com"
+}
+
+variable "slack_channel" {
+  description = "Slack channel for problem notifications (boostability workspace). The Zabbix bot must be invited to it."
+  type        = string
+  default     = "#it-alerts"
+}
+
 variable "secretsmanager_endpoint_sg_id" {
   description = "Security group of the VPC's Secrets Manager interface endpoint (vpce-0758d22218276d2d9, private DNS on). Every host in the VPC resolves secretsmanager.us-west-2.amazonaws.com to that endpoint, so this SG must admit the Zabbix host or the boot-time secret fetch times out. Set to \"\" if the endpoint is ever removed."
   type        = string

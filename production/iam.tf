@@ -70,6 +70,21 @@ resource "aws_iam_role_policy" "zabbix_host_bootstrap" {
         Resource = "${aws_s3_bucket.state.arn}/${local.state_prefix}/*"
       },
       {
+        Sid      = "ReadAlertingParameters"
+        Effect   = "Allow"
+        Action   = ["ssm:GetParameter", "ssm:GetParameters", "ssm:GetParametersByPath"]
+        Resource = "arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/netmon-zabbix/*"
+      },
+      {
+        Sid      = "DecryptSsmParameters"
+        Effect   = "Allow"
+        Action   = ["kms:Decrypt"]
+        Resource = "*"
+        Condition = {
+          StringEquals = { "kms:ViaService" = "ssm.${var.aws_region}.amazonaws.com" }
+        }
+      },
+      {
         Sid      = "ReportOwnHealth"
         Effect   = "Allow"
         Action   = ["autoscaling:SetInstanceHealth"]

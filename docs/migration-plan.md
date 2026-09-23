@@ -65,10 +65,9 @@ surfaced are in `bootstrap.sh`), server 7.0.31 up against RDS, EIP 32.187.30.106
   (read-only). Consider LDAP/SAML against Prod.local or Google later.
 - User groups mirroring PRTG notification groups: IT Group, Sysadmin, Production,
   Germany, Blog Support.
-- Media types (decided: Slack + email only): Slack via the built-in Slack media type
-  (incoming webhook or bot token), email via SES SMTP credentials in boostprod
-  (IAM SMTP user, TLS on 587) or the corp relay. PRTG's SMS and Google Chat
-  notifications are not carried over.
+- Media types (decided: Slack #it-alerts + email it@boostability.com): built by
+  `production/alerting.tf` + `zabbix/apply-alerting.sh` (see README "Alerting").
+  PRTG's SMS and Google Chat notifications are not carried over.
 - Actions: one per severity band, reproduce the PRTG notification matrix.
 - Housekeeping: default 90d history / 365d trends is fine at this scale.
 
