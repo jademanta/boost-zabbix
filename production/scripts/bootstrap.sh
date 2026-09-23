@@ -73,6 +73,7 @@ chmod 400 "$RUN_DIR"/secrets/*
 aws s3 sync "$CADDY_S3" "$RUN_DIR/caddy" --only-show-errors || echo "no caddy state in S3 yet"
 
 # --- 5. This repo: compose.yaml, Caddyfile, alertscripts --------------------
+git config --system --add safe.directory "$REPO_DIR"   # repo is owned by ubuntu; root (SSM, timers) must be able to pull
 if [ -d "$REPO_DIR/.git" ]; then
   git -C "$REPO_DIR" pull --ff-only
 else
